@@ -1,85 +1,110 @@
 package controllers
 
 import (
-	"encoding/json"
-	"log"
+	"html/template"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-resty/resty/v2"
-	"github.com/gorilla/websocket"
+
+	"test-warungpintar/message"
+	"test-warungpintar/tools"
 )
 
-//PingServer is controllers for request to server
-func PingServer(c *gin.Context) {
-	msg := c.Query("message")
-	if msg == "" {
-		msg = "pong"
+var (
+	indexTempl = template.Must(template.New("").Parse(indexHTML))
+)
+
+const indexHTML = `<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>WebSocket Example</title>
+    </head>
+    <body>
+        <pre id="fileData">{{.Data}}</pre>
+        <script type="text/javascript">
+            (function() {
+                var data = document.getElementById("fileData");
+                var conn = new WebSocket("ws://{{.Host}}/ws?lastMod={{.LastMod}}");
+                conn.onclose = function(evt) {
+                    data.textContent = 'Connection closed';
+                }
+                conn.onmessage = function(evt) {
+                    console.log('file updated');
+                    data.textContent = evt.data;
+                }
+            })();
+        </script>
+    </body>
+</html>
+`
+
+//Sample is controllers for request to server
+func Sample(c *gin.Context) {
+	urlParam := struct {
+		Msg string `form:"message" binding:"required"`
+	}{}
+	//check url query param same with blueprint
+	if err := c.ShouldBindQuery(&urlParam); err != nil {
+		msg := message.New(4, err)
+		c.AbortWithStatusJSON(msg.StatusCode, msg)
+		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": msg})
+
+	//write response to txt
+	if err := tools.WriteFile(urlParam.Msg); err != nil {
+		msg := message.New(4, err)
+		c.AbortWithStatusJSON(msg.StatusCode, msg)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": urlParam.Msg})
 }
 
-//PingClient is controllers for request from client to PingServer
-func PingClient(c *gin.Context) {
-	var response struct {
-		Msg string `json:"message"`
-	}
-
-	msg := c.Query("message")
-
-	// Create a Resty Client
-	client := resty.New()
-	resp, err := client.R().
-		SetQueryParams(map[string]string{
-			"message": msg,
-		}).
-		SetHeader("Accept", "application/json").
-		Get("http://localhost/ping/server")
-
-	//raise error when cant connect to server
+//ShowResponse is controllers for show previous response
+func ShowResponse(c *gin.Context) {
+	data, err := tools.ReadFile()
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-			"message": err.Error(),
-		})
+		msg := message.New(4, err)
+		c.AbortWithStatusJSON(msg.StatusCode, msg)
 		return
 	}
-
-	//raise error when cant unmarshall body response
-	if err := json.Unmarshal(resp.Body(), &response); err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-			"message": err.Error(),
-		})
-		return
+	responseAll := struct {
+		Total int      `json:"total"`
+		Data  []string `json:"data"`
+	}{
+		len(data),
+		data,
 	}
-	log.Println("response", response)
-	c.JSON(http.StatusOK, gin.H{"message": response.Msg})
+	c.JSON(http.StatusOK, responseAll)
 }
 
-//PingWs is controllers for request to server via websocket
-func PingWs(c *gin.Context) {
-	var wsupgrader = websocket.Upgrader{
-		ReadBufferSize:  1024,
-		WriteBufferSize: 1024,
-	}
-	conn, err := wsupgrader.Upgrade(c.Writer, c.Request, nil)
+//Index is controllers for show html page and listen websocket
+func Index(c *gin.Context) {
+
+	w := c.Writer
+	r := c.Request
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	p, lastMod, err := tools.ReadFileIfModified(time.Time{})
 	if err != nil {
-		log.Println("Failed to set websocket upgrade: ", err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-			"message": err.Error(),
-		})
-		return
+		p = []byte(err.Error())
+		lastMod = time.Unix(0, 0)
 	}
-	defer conn.Close()
-	for {
-		messageType, msg, err := conn.ReadMessage()
-		if err != nil {
-			break
-		}
-		log.Printf("recv: %s", msg)
-		err = conn.WriteMessage(messageType, msg)
-		if err != nil {
-			log.Println("write:", err)
-			break
-		}
+	var v = struct {
+		Host    string
+		Data    string
+		LastMod string
+	}{
+		r.Host,
+		string(p),
+		strconv.FormatInt(lastMod.UnixNano(), 16),
 	}
+	indexTempl.Execute(w, &v)
+}
+
+//RunWs used for handling websocket
+func RunWs(c *gin.Context) {
+	ws := tools.NewInitWs(c.Writer, c.Request)
+	ws.ServeWs()
 }

@@ -12,14 +12,16 @@
 - [Gin-Gonic Framework](https://github.com/gin-gonic/gin)
 
 ## Overview 
+This Repo uses websocket for implementing retrive message with long live connection. The websocket uses `filewatch` txt file to listen and show the responses based on browser.
 
-There is 4 endpoint for this repo :
+
+There is 4 endpoint :
 
 | Endpoint | Method |Description
 | ------ | ----------- | ------ |
-| /ping/server   | GET |this endpoint used for generate response from server.
-| /ping/client | GET |this endpoint used as client and request message to server. Handlebars is the default.
-| /ping/ws    | GET |this endpoint used for handling websocket. 
+| /sample   | GET |this endpoint used for generate response from server and save to txt file.
+| /show| GET |this endpoint used as show all response.
+| /ws    | GET |this endpoint used for handling websocket. 
 | /index    | GET |this endpoint used for generate idex.html to trigger websocket. 
 
 
@@ -29,37 +31,50 @@ There is 4 endpoint for this repo :
 ```bash
 git clone https://github.com/iqbaldp78/test-case-warung-pintar.git
 ```
-- start docker
+- using docker
 
 ```shell
 cd test-case-warung-pintar
 
-docker build --rm -f "dockerfile" -t test-case-warung-pintar:latest .
+docker build --rm -f "Dockerfile" -t test-case-warung-pintar:latest .
 
-docker run -d -it -p 8080:80 test-case-warung-pintar:latest
+docker run -d -it -p 8080:8080 test-case-warung-pintar:latest
+```
+
+- run manually
+```shell
+cd test-case-warung-pintar
+
+go run main.go
 ```
 
 note :
 if port 8080 is already used on your computer, try to changing another port, e.g. 8070
 
 
+if you want to try websocket
+
+1. open your browser and go to http://localhost:8080/index
+2. hit /sample endpoint
+3. and the browser will showing the response realtime
+
 <a name="top"></a>
 # API Doc
 
-
-- [ping/server](#ping/server)
-- [ping/client](#ping/client)
-- [ping/ws](#ping/ws)
-- [ping/index](#ping/index)
+- [sample](#sample)
+- [show](#show)
+- [ws](#ws)
+- [index](#index)
 	
 
 
-# <a name='ping/server'></a> ping/server
+# <a name='sample'></a> sample
 [Back to top](#top)
 
-<p>ping/server</p>
+<p>sample</p>
+this endpoint used for generate response from server and save to txt file (output_response.txt).
 
-	GET /ping/server?message=ping
+	GET /sample?message=ping
 
 
 
@@ -69,14 +84,14 @@ if port 8080 is already used on your computer, try to changing another port, e.g
 
 | Name     | Type       | Description                           |
 |:---------|:-----------|:--------------------------------------|
-|  message | String | <p>message will be send</p>|
+|  message | String (Required) | <p>message will be send to response</p>|
 
 ### Examples
 
 request body {curl} Example usage:
 
 ```
-curl -i http://localhost:8080//ping/server?message=ping
+curl -i http://localhost:8080/sample?message=ping
 ```
 
 
@@ -121,29 +136,25 @@ HTTP/1.1 500 Internal Server Error
 
 
 
-# <a name='ping/client'></a> ping/client
+# <a name='show'></a> show
 [Back to top](#top)
 
-<p>ping/client</p>
+<p>show</p>
+this endpoint used as show all response from txt file (output_response.txt).
 
-	GET /ping/client?message=ping
-
-
-
+	GET /show
 
 
-### Parameters URL
 
-| Name     | Type       | Description                           |
-|:---------|:-----------|:--------------------------------------|
-|  message | String | <p>message will be send to server</p>|
+
+
 
 ### Examples
 
 request body {curl} Example usage:
 
 ```
-curl -i http://localhost:8080//ping/server?message=ping
+curl -i http://localhost:8080/show
 ```
 
 
@@ -154,7 +165,10 @@ Success-Response:
 ```
 HTTP/1.1 200 Ok
 {
-    "message": "ping"
+    "total": 1,
+    "data": [
+        "ping"
+    ]
 }
 ```
 
@@ -162,7 +176,8 @@ HTTP/1.1 200 Ok
 
 | Name     | Type       | Description                           |
 |:---------|:-----------|:--------------------------------------|
-|  message | String | <p>Response from server</p>|
+|  total | Int | <p>Total data response</p>|
+|  data | []String | <p>Show all responses</p>|
 
 
 ### Error Response
@@ -187,20 +202,20 @@ HTTP/1.1 500 Internal Server Error
 ```
 
 
-# <a name='ping/ws'></a> ping/ws
+# <a name='ws'></a> ws
 [Back to top](#top)
 
-<p>ping/ws</p>
+<p>ws</p>
 
-	GET ws://localhost:8080/ping/ws
+	GET ws://localhost:8080/ws
 
 this websocket endpoint will be trigger when you run ping/index endpoint
 
-# <a name='ping/index'></a> ping/index
+# <a name='index'></a> index
 [Back to top](#top)
 
-<p>ping/index</p>
+<p>index</p>
 
-	GET http://localhost:8080/ping/index
+	GET http://localhost:8080/index
 
 this endpoint will be show html page
