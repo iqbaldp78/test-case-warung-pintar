@@ -22,7 +22,7 @@ There is 4 endpoint :
 | /sample   | GET |this endpoint used for generate response from server and save to txt file.
 | /show| GET |this endpoint used as show all response.
 | /ws    | GET |this endpoint used for handling websocket. 
-| /index    | GET |this endpoint used for generate idex.html to trigger websocket. 
+| /index    | GET |this endpoint used for generate index.html to show the response. 
 
 
 ## How to trial 
